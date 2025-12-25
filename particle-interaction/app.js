@@ -24,13 +24,14 @@ const TUTORIAL_SCALE_CC = "Awesome! Finally, pinch with both hands and zoom in/o
 // 3D Tutorial Constants
 const TUTORIAL_3D_INTRO = "Now you've mastered all skills when interacting with texts, let's move on to 3D scenes...";
 const TUTORIAL_3D_LOOK = "Pinch with three fingers on your RIGHT hand and drag to look around";
-const TUTORIAL_3D_MOVE = "Great! Now pinch with three fingers on your LEFT hand and drag to move";
+const TUTORIAL_3D_ZOOM = "Great! Now pinch with BOTH hands and pull apart/together to move forward/backward";
+const TUTORIAL_3D_MOVE = "Awesome! Finally, pinch with three fingers on your LEFT hand and drag to move";
 const TUTORIAL_3D_COMPLETE = "Excellent! You've mastered 3D navigation. Tutorial complete!";
 const INTRO_FORMATION_TIME = 1000; // ms for particles to form the text (~1s)
 const INTRO_STAY_TIME = 1500; // ms to stay after text is formed
 const INTRO_FIRST_TEXT_STAY = 5000; // First text "Merry Christmas" stays 5 seconds
 const INTRO_DURATION = INTRO_FORMATION_TIME + INTRO_STAY_TIME; // Total time per intro text (after first)
-// Phases: 0-7=existing, 8-10=ParticleTutorial, 11=3DIntro, 12=3DLook, 13=3DMove, 14=3DComplete, 15=done
+// Phases: 0-7=existing, 8-10=ParticleTutorial, 11=3DIntro, 12=3DLook, 13=3DZoom, 14=3DMove, 15=3DComplete, 16=done
 let introPhase = 0;
 let introComplete = false;
 let handRecognitionEnabled = false;
@@ -45,6 +46,7 @@ let waitingForRotate = false;
 let waitingForScale = false;
 // 3D Tutorial states
 let waitingFor3DLook = false;
+let waitingFor3DZoom = false;
 let waitingFor3DMove = false;
 const PARTICLE_SIZE = 0.12;
 const PARTICLE_COLOR = 0xffffff;
@@ -937,8 +939,9 @@ async function init() {
                 }
             }
 
-            // Process gesture interactions during tutorial (phases 8-10) or when intro is complete
-            if (introComplete || (introPhase >= 8 && introPhase <= 10)) {
+            // Process gesture interactions during tutorial (phases 8-11) or when intro is complete
+            // Phase 11 allows user to continue scaling during the "success" celebration delay
+            if (introComplete || (introPhase >= 8 && introPhase <= 11)) {
                 onHandsResults(results);
 
                 // Check for tutorial gesture completions
@@ -964,13 +967,18 @@ async function init() {
                         on3DMoveDetected();
                     }
                 }
-            } else if (introPhase >= 12 && introPhase <= 13) {
-                // During 3D tutorial phases, process Cherry Blossom gestures
+            } else if (introPhase >= 12 && introPhase <= 15) {
+                // During 3D tutorial phases (12-15), process Cherry Blossom gestures
+                // Phase 15 allows user to continue moving during the "complete" celebration delay
                 onHandsResults(results);
 
                 // Check for 3D tutorial gesture completions
                 if (waitingFor3DLook && isRotating) {
                     on3DLookDetected();
+                }
+                // Check for 3D zoom (two-hand pinch) - use previousScaleDistance as indicator
+                if (waitingFor3DZoom && previousScaleDistance > 0) {
+                    on3DZoomDetected();
                 }
                 if (waitingFor3DMove && previousGripPos !== null) {
                     on3DMoveDetected();
@@ -1238,6 +1246,7 @@ function startIntroSequence() {
     waitingForRotate = false;
     waitingForScale = false;
     waitingFor3DLook = false;
+    waitingFor3DZoom = false;
     waitingFor3DMove = false;
     hideCC();
 
@@ -1411,19 +1420,33 @@ function on3DLookDetected() {
     waitingFor3DLook = false;
     introPhase = 13;
 
+    // Show zoom tutorial CC
+    showCC(TUTORIAL_3D_ZOOM);
+    waitingFor3DZoom = true;
+    console.log('🔍 Waiting for 3D zoom gesture (two-hand pinch)...');
+}
+
+// Called when 3D zoom gesture is detected during tutorial
+function on3DZoomDetected() {
+    if (!waitingFor3DZoom || introPhase !== 13) return;
+
+    console.log('✅ 3D zoom gesture detected!');
+    waitingFor3DZoom = false;
+    introPhase = 14;
+
     // Show move tutorial CC
     showCC(TUTORIAL_3D_MOVE);
     waitingFor3DMove = true;
-    console.log('🚶 Waiting for 3D move gesture (right 3-finger pinch)...');
+    console.log('🚶 Waiting for 3D move gesture (left 3-finger pinch)...');
 }
 
 // Called when 3D move gesture is detected during tutorial
 function on3DMoveDetected() {
-    if (!waitingFor3DMove || introPhase !== 13) return;
+    if (!waitingFor3DMove || introPhase !== 14) return;
 
     console.log('✅ 3D move gesture detected!');
     waitingFor3DMove = false;
-    introPhase = 14;
+    introPhase = 15;
 
     // Show completion CC
     showCC(TUTORIAL_3D_COMPLETE);
@@ -1436,9 +1459,8 @@ function on3DMoveDetected() {
 
 // Called when entire tutorial is complete
 function onTutorialComplete() {
-    introPhase = 15;
+    introPhase = 16;
     introComplete = true;
-    hideCC();
 
     // Exit Cherry Blossom mode back to particle mode
     if (isCherryBlossomMode) {
@@ -1448,6 +1470,14 @@ function onTutorialComplete() {
     // Set to first regular text model
     currentModelIndex = -1;
     changeText(0);
+
+    // Show exploration message
+    showCC("Now you may explore what texts and what scenes we have built in, and maybe discover some little eastereggs!");
+
+    // Hide the CC after 5 seconds
+    setTimeout(() => {
+        hideCC();
+    }, 5000);
 
     console.log('🎉 Full tutorial complete! All interactions enabled.');
 }
