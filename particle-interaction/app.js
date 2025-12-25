@@ -18,12 +18,15 @@ const TUTORIAL_FINGER_CC = "This is the finger you use for switching between sce
 const TUTORIAL_SWITCH_PROMPT = "Now with your right finger showing 1, you can switch scenes with your left hand. For example, with your right hand showing 1, show 1 with your left hand";
 const TUTORIAL_SWITCH_SUCCESS = "Welldone";
 const TUTORIAL_SCENE2_PROMPT = "Now try showing your left hand with 2 with righthand 1 and see what we have in scene 2!";
-const TUTORIAL_DRAG_CC = "Pinch with your right index and thumb, and try to drag and move the element";
+const TUTORIAL_DRAG_CC = "Pinch with your left index and thumb, and try to drag and move the element";
+const TUTORIAL_ROTATE_CC = "Great! Now pinch with three fingers (thumb + index + middle) and rotate!";
+const TUTORIAL_SCALE_CC = "Awesome! Finally, pinch with both hands and zoom in/out!";
+const TUTORIAL_COMPLETE_CC = "Perfect! You've mastered all the gestures. Enjoy exploring!";
 const INTRO_FORMATION_TIME = 1000; // ms for particles to form the text (~1s)
 const INTRO_STAY_TIME = 1500; // ms to stay after text is formed
 const INTRO_FIRST_TEXT_STAY = 5000; // First text "Merry Christmas" stays 5 seconds
 const INTRO_DURATION = INTRO_FORMATION_TIME + INTRO_STAY_TIME; // Total time per intro text (after first)
-// Phases: 0=MerryXmas, 1=BPPresents, 2=ShowPalms, 3=GoodLetsGo, 4=ShowFinger, 5=FingerDetected, 6=WaitLeftOne, 7=WaitLeftTwo, 8=DragTutorial, 9=done
+// Phases: 0-7=existing, 8=DragTutorial, 9=RotateTutorial, 10=ScaleTutorial, 11=Complete, 12=done
 let introPhase = 0;
 let introComplete = false;
 let handRecognitionEnabled = false;
@@ -31,6 +34,10 @@ let waitingForPalms = false; // True when waiting for user to show palms
 let waitingForFinger = false; // True when waiting for right hand "1" gesture
 let waitingForLeftOne = false; // True when waiting for left hand "1" while right shows "1"
 let waitingForLeftTwo = false; // True when waiting for left hand "2" while right shows "1"
+// Interactive tutorial states
+let waitingForDrag = false;
+let waitingForRotate = false;
+let waitingForScale = false;
 const PARTICLE_SIZE = 0.12;
 const PARTICLE_COLOR = 0xffffff;
 const CANVAS_WIDTH = 1024; // Resolution for text generation
@@ -913,9 +920,28 @@ async function init() {
                 }
             }
 
-            // Only process full interaction if intro is complete
-            if (introComplete) {
+            // Process gesture interactions during tutorial (phases 8-10) or when intro is complete
+            if (introComplete || (introPhase >= 8 && introPhase <= 10)) {
                 onHandsResults(results);
+
+                // Check for tutorial gesture completions
+                if (!introComplete) {
+                    // Check if drag was detected during this frame
+                    if (waitingForDrag && isDragging) {
+                        onDragDetected();
+                    }
+                    // Check if rotate was detected during this frame
+                    if (waitingForRotate && isRotating) {
+                        onRotateDetected();
+                    }
+                    // Check if scale was detected during this frame
+                    if (waitingForScale && isScaling) {
+                        onScaleDetected();
+                    }
+                }
+            } else {
+                // During early tutorial phases, still show hand visuals for feedback
+                updateHandVisuals(results.multiHandLandmarks, results.multiHandedness);
             }
         }
     });
@@ -1171,6 +1197,9 @@ function startIntroSequence() {
     waitingForFinger = false;
     waitingForLeftOne = false;
     waitingForLeftTwo = false;
+    waitingForDrag = false;
+    waitingForRotate = false;
+    waitingForScale = false;
     hideCC();
 
     // Show first intro text: "Merry Christmas"
@@ -1268,22 +1297,64 @@ function onLeftTwoDetected() {
         // Switch to "Merry Christmas" and show drag tutorial CC
         setTextDirect(INTRO_TEXTS[0]); // "Merry Christmas"
         showCC(TUTORIAL_DRAG_CC);
-        console.log('🎯 Showing drag tutorial...');
-
-        // Complete tutorial after 5 seconds (give user time to try dragging)
-        setTimeout(() => {
-            introPhase = 9;
-            introComplete = true;
-            hideCC();
-
-            // Set to first regular text model
-            currentModelIndex = -1;
-            changeText(0);
-
-            console.log('🎉 Tutorial complete! Full interaction enabled.');
-        }, 5000);
+        waitingForDrag = true;
+        console.log('🎯 Waiting for drag gesture...');
     }, 3000);
 }
+
+// Called when drag gesture is detected during tutorial
+function onDragDetected() {
+    if (!waitingForDrag || introPhase !== 8) return;
+
+    console.log('✅ Drag gesture detected!');
+    waitingForDrag = false;
+    introPhase = 9;
+
+    // Show rotate tutorial CC
+    showCC(TUTORIAL_ROTATE_CC);
+    waitingForRotate = true;
+    console.log('🔄 Waiting for rotate gesture...');
+}
+
+// Called when rotate gesture is detected during tutorial
+function onRotateDetected() {
+    if (!waitingForRotate || introPhase !== 9) return;
+
+    console.log('✅ Rotate gesture detected!');
+    waitingForRotate = false;
+    introPhase = 10;
+
+    // Show scale tutorial CC
+    showCC(TUTORIAL_SCALE_CC);
+    waitingForScale = true;
+    console.log('🔍 Waiting for scale gesture...');
+}
+
+// Called when scale gesture is detected during tutorial
+function onScaleDetected() {
+    if (!waitingForScale || introPhase !== 10) return;
+
+    console.log('✅ Scale gesture detected!');
+    waitingForScale = false;
+    introPhase = 11;
+
+    // Show completion CC
+    showCC(TUTORIAL_COMPLETE_CC);
+
+    // Complete tutorial after 3 seconds
+    setTimeout(() => {
+        introPhase = 12;
+        introComplete = true;
+        hideCC();
+
+        // Set to first regular text model
+        currentModelIndex = -1;
+        changeText(0);
+
+        console.log('🎉 Tutorial complete! Full interaction enabled.');
+    }, 3000);
+}
+
 
 // CC Overlay Functions
 function showCC(text) {
