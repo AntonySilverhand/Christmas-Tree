@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浪漫樱花林 - Romantic Cherry Blossom Forest</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            background: linear-gradient(180deg,
+                    #1a0a1a 0%,
+                    #2d1b3d 20%,
+                    #4a2c5a 40%,
+                    #ff9ec4 70%,
+                    #ffc4d6 85%,
+                    #ffe4ec 100%);
+            font-family: 'Georgia', serif;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .title {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+            opacity: 0;
+            animation: fadeIn 3s ease-out 2s forwards;
+        }
+
+        .title h1 {
+            font-size: 4rem;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 0 30px rgba(255, 182, 193, 0.8),
+                0 0 60px rgba(255, 105, 180, 0.6),
+                0 0 100px rgba(255, 20, 147, 0.4);
+            letter-spacing: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .title p {
+            font-size: 1.5rem;
+            color: rgba(255, 228, 236, 0.8);
+            text-shadow: 0 0 20px rgba(255, 182, 193, 0.5);
+            font-style: italic;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -40%);
+            }
+
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
+
+        .hint {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+            z-index: 10;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 0.6;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="canvas-container"></div>
+
+    <div class="title">
+        <h1>樱花林</h1>
+        <p>在这片浪漫的花海中，时光静止</p>
+    </div>
+
+    <div class="hint">移动鼠标探索樱花林 · Move mouse to explore</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // ==================== 场景初始化 ====================
+        let scene, camera, renderer;
+        let trees = [];
+        let petals = [];
+        let time = 0;
+        let mouseX = 0, mouseY = 0;
+        let targetCameraX = 0, targetCameraY = 0;
+
+        function init() {
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0xffb6c1, 0.015);
+
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 20);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // 添加光源
+            addLights();
+
+            // 创建地面
+            createGround();
+
+            // 创建樱花树林
+            createCherryBlossomForest();
+
+            // 创建飘落的樱花花瓣
+            createFallingPetals();
+
+            // 添加远景山脉
+            createMountains();
+
+            // 添加月亮
+            createMoon();
+
+            // 事件监听
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('mousemove', onMouseMove);
+
+            // 开始动画
+            animate();
+        }
+
+        // ==================== 光源系统 ====================
+        function addLights() {
+            // 环境光 - 粉色调
+            const ambientLight = new THREE.AmbientLight(0xffc0cb, 0.4);
+            scene.add(ambientLight);
+
+            // 主光源 - 模拟月光
+            const moonLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            moonLight.position.set(50, 100, 50);
+            moonLight.castShadow = true;
+            moonLight.shadow.mapSize.width = 2048;
+            moonLight.shadow.mapSize.height = 2048;
+            scene.add(moonLight);
+
+            // 粉色点光源 - 增加浪漫氛围
+            const pinkLight1 = new THREE.PointLight(0xff69b4, 0.8, 50);
+            pinkLight1.position.set(-10, 10, 0);
+            scene.add(pinkLight1);
+
+            const pinkLight2 = new THREE.PointLight(0xff1493, 0.6, 40);
+            pinkLight2.position.set(10, 8, -10);
+            scene.add(pinkLight2);
+
+            // 紫色点光源
+            const purpleLight = new THREE.PointLight(0xda70d6, 0.5, 60);
+            purpleLight.position.set(0, 15, 10);
+            scene.add(purpleLight);
+        }
+
+        // ==================== 地面 ====================
+        function createGround() {
+            // 草地
+            const groundGeometry = new THREE.PlaneGeometry(200, 200, 50, 50);
+
+            // 给地面添加起伏
+            const vertices = groundGeometry.attributes.position.array;
+            for (let i = 0; i < vertices.length; i += 3) {
+                vertices[i + 2] += Math.sin(vertices[i] * 0.1) * Math.cos(vertices[i + 1] * 0.1) * 0.5;
+            }
+            groundGeometry.computeVertexNormals();
+
+            const groundMaterial = new THREE.MeshStandardMaterial({
+                color: 0x2d5016,
+                roughness: 0.9,
+                metalness: 0.1
+            });
+
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -0.5;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // 添加落花层
+            const petalGroundGeometry = new THREE.PlaneGeometry(200, 200);
+            const petalGroundMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffb6c1,
+                transparent: true,
+                opacity: 0.3,
+                roughness: 1
+            });
+            const petalGround = new THREE.Mesh(petalGroundGeometry, petalGroundMaterial);
+            petalGround.rotation.x = -Math.PI / 2;
+            petalGround.position.y = -0.4;
+            scene.add(petalGround);
+        }
+
+        // ==================== 樱花树 ====================
+        function createCherryBlossomTree(x, z, scale = 1) {
+            const treeGroup = new THREE.Group();
+
+            // 树干
+            const trunkGeometry = new THREE.CylinderGeometry(0.3 * scale, 0.5 * scale, 4 * scale, 8);
+            const trunkMaterial = new THREE.MeshStandardMaterial({
+                color: 0x4a3728,
+                roughness: 0.9
+            });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunk.position.y = 2 * scale;
+            trunk.castShadow = true;
+            treeGroup.add(trunk);
+
+            // 树枝 - 多层
+            const branchMaterial = new THREE.MeshStandardMaterial({
+                color: 0x3d2b1f,
+                roughness: 0.8
+            });
+
+            for (let layer = 0; layer < 3; layer++) {
+                const layerHeight = 3 * scale + layer * 1.5 * scale;
+                const numBranches = 5 + layer * 2;
+
+                for (let i = 0; i < numBranches; i++) {
+                    const angle = (i / numBranches) * Math.PI * 2 + layer * 0.3;
+                    const branchLength = (2 + Math.random()) * scale;
+
+                    const branchGeometry = new THREE.CylinderGeometry(
+                        0.05 * scale,
+                        0.15 * scale,
+                        branchLength,
+                        6
+                    );
+                    const branch = new THREE.Mesh(branchGeometry, branchMaterial);
+
+                    branch.position.set(
+                        Math.cos(angle) * 0.3 * scale,
+                        layerHeight,
+                        Math.sin(angle) * 0.3 * scale
+                    );
+                    branch.rotation.z = Math.PI / 4 + Math.random() * 0.3;
+                    branch.rotation.y = angle;
+                    branch.castShadow = true;
+                    treeGroup.add(branch);
+                }
+            }
+
+            // 樱花树冠 - 多个球形组合
+            const blossomColors = [0xffb6c1, 0xffc0cb, 0xff69b4, 0xffd1dc, 0xffb7c5];
+
+            // 主树冠
+            for (let i = 0; i < 8; i++) {
+                const radius = (1.5 + Math.random() * 1.5) * scale;
+                const blossomGeometry = new THREE.SphereGeometry(radius, 16, 16);
+                const blossomMaterial = new THREE.MeshStandardMaterial({
+                    color: blossomColors[Math.floor(Math.random() * blossomColors.length)],
+                    roughness: 0.8,
+                    metalness: 0.1,
+                    transparent: true,
+                    opacity: 0.9
+                });
+
+                const blossom = new THREE.Mesh(blossomGeometry, blossomMaterial);
+
+                const angle = (i / 8) * Math.PI * 2;
+                const distance = (1.5 + Math.random()) * scale;
+                blossom.position.set(
+                    Math.cos(angle) * distance,
+                    (5 + Math.random() * 2) * scale,
+                    Math.sin(angle) * distance
+                );
+
+                blossom.castShadow = true;
+                treeGroup.add(blossom);
+            }
+
+            // 顶部树冠
+            for (let i = 0; i < 4; i++) {
+                const radius = (1 + Math.random()) * scale;
+                const blossomGeometry = new THREE.SphereGeometry(radius, 12, 12);
+                const blossomMaterial = new THREE.MeshStandardMaterial({
+                    color: blossomColors[Math.floor(Math.random() * blossomColors.length)],
+                    roughness: 0.7,
+                    transparent: true,
+                    opacity: 0.85
+                });
+
+                const blossom = new THREE.Mesh(blossomGeometry, blossomMaterial);
+
+                const angle = (i / 4) * Math.PI * 2;
+                blossom.position.set(
+                    Math.cos(angle) * 0.8 * scale,
+                    (7 + Math.random()) * scale,
+                    Math.sin(angle) * 0.8 * scale
+                );
+
+                treeGroup.add(blossom);
+            }
+
+            // 中央顶部
+            const topBlossomGeometry = new THREE.SphereGeometry(1.2 * scale, 16, 16);
+            const topBlossomMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffd1dc,
+                roughness: 0.6,
+                transparent: true,
+                opacity: 0.9
+            });
+            const topBlossom = new THREE.Mesh(topBlossomGeometry, topBlossomMaterial);
+            topBlossom.position.y = 8 * scale;
+            treeGroup.add(topBlossom);
+
+            treeGroup.position.set(x, 0, z);
+
+            // 添加轻微随机旋转
+            treeGroup.rotation.y = Math.random() * Math.PI * 2;
+
+            return treeGroup;
+        }
+
+        function createCherryBlossomForest() {
+            // 中心区域的主要树木
+            const mainTreePositions = [
+                { x: 0, z: 0, scale: 1.2 },
+                { x: -6, z: -5, scale: 1.0 },
+                { x: 6, z: -4, scale: 1.1 },
+                { x: -8, z: 3, scale: 0.9 },
+                { x: 8, z: 2, scale: 1.0 },
+                { x: 3, z: -8, scale: 0.95 },
+                { x: -4, z: -9, scale: 1.05 },
+            ];
+
+            mainTreePositions.forEach(pos => {
+                const tree = createCherryBlossomTree(pos.x, pos.z, pos.scale);
+                trees.push(tree);
+                scene.add(tree);
+            });
+
+            // 远景树木 - 创建密集的樱花林
+            for (let i = 0; i < 40; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 15 + Math.random() * 35;
+                const x = Math.cos(angle) * distance;
+                const z = Math.sin(angle) * distance - 10;
+                const scale = 0.6 + Math.random() * 0.5;
+
+                const tree = createCherryBlossomTree(x, z, scale);
+                trees.push(tree);
+                scene.add(tree);
+            }
+
+            // 侧面填充
+            for (let i = 0; i < 25; i++) {
+                const x = (Math.random() - 0.5) * 60;
+                const z = -20 - Math.random() * 30;
+                const scale = 0.5 + Math.random() * 0.6;
+
+                const tree = createCherryBlossomTree(x, z, scale);
+                trees.push(tree);
+                scene.add(tree);
+            }
+        }
+
+        // ==================== 飘落的花瓣 ====================
+        function createFallingPetals() {
+            const petalCount = 500;
+
+            for (let i = 0; i < petalCount; i++) {
+                const petalGeometry = new THREE.PlaneGeometry(0.15, 0.2);
+                const petalMaterial = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color().setHSL(0.95 + Math.random() * 0.05, 0.6 + Math.random() * 0.3, 0.8 + Math.random() * 0.15),
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.8 + Math.random() * 0.2
+                });
+
+                const petal = new THREE.Mesh(petalGeometry, petalMaterial);
+
+                // 随机初始位置
+                petal.position.set(
+                    (Math.random() - 0.5) * 80,
+                    Math.random() * 30,
+                    (Math.random() - 0.5) * 80 - 10
+                );
+
+                // 随机旋转
+                petal.rotation.set(
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI
+                );
+
+                // 存储动画参数
+                petal.userData = {
+                    fallSpeed: 0.01 + Math.random() * 0.02,
+                    swaySpeed: 1 + Math.random() * 2,
+                    swayAmount: 0.5 + Math.random() * 1,
+                    rotateSpeed: 0.01 + Math.random() * 0.03,
+                    initialX: petal.position.x,
+                    phase: Math.random() * Math.PI * 2
+                };
+
+                petals.push(petal);
+                scene.add(petal);
+            }
+        }
+
+        // ==================== 远景山脉 ====================
+        function createMountains() {
+            const mountainMaterial = new THREE.MeshStandardMaterial({
+                color: 0x4a3050,
+                roughness: 1,
+                metalness: 0
+            });
+
+            // 创建多层山脉
+            for (let layer = 0; layer < 3; layer++) {
+                const points = [];
+                const segments = 20;
+
+                for (let i = 0; i <= segments; i++) {
+                    const x = (i / segments - 0.5) * 200;
+                    const height = 10 + Math.sin(i * 0.5 + layer) * 8 + Math.random() * 5;
+                    points.push(new THREE.Vector2(x, height));
+                }
+
+                points.push(new THREE.Vector2(100, 0));
+                points.push(new THREE.Vector2(-100, 0));
+
+                const shape = new THREE.Shape(points);
+                const extrudeSettings = {
+                    steps: 1,
+                    depth: 10 + layer * 5,
+                    bevelEnabled: false
+                };
+
+                const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                const material = mountainMaterial.clone();
+                material.color = new THREE.Color().setHSL(0.8 - layer * 0.05, 0.3, 0.25 - layer * 0.05);
+
+                const mountain = new THREE.Mesh(geometry, material);
+                mountain.rotation.x = Math.PI / 2;
+                mountain.position.z = -60 - layer * 20;
+                mountain.position.y = -5;
+                scene.add(mountain);
+            }
+        }
+
+        // ==================== 月亮 ====================
+        function createMoon() {
+            const moonGeometry = new THREE.SphereGeometry(8, 32, 32);
+            const moonMaterial = new THREE.MeshBasicMaterial({
+                color: 0xfffef0
+            });
+            const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+            moon.position.set(40, 60, -80);
+            scene.add(moon);
+
+            // 月亮光晕
+            const glowGeometry = new THREE.SphereGeometry(12, 32, 32);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0xfff8e7,
+                transparent: true,
+                opacity: 0.3
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            glow.position.copy(moon.position);
+            scene.add(glow);
+
+            // 外层光晕
+            const outerGlowGeometry = new THREE.SphereGeometry(18, 32, 32);
+            const outerGlowMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffeedd,
+                transparent: true,
+                opacity: 0.15
+            });
+            const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
+            outerGlow.position.copy(moon.position);
+            scene.add(outerGlow);
+        }
+
+        // ==================== 动画循环 ====================
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.01;
+
+            // 相机跟随鼠标
+            targetCameraX = mouseX * 5;
+            targetCameraY = mouseY * 2 + 5;
+
+            camera.position.x += (targetCameraX - camera.position.x) * 0.02;
+            camera.position.y += (targetCameraY - camera.position.y) * 0.02;
+            camera.lookAt(0, 4, -10);
+
+            // 树木轻微摇摆
+            trees.forEach((tree, index) => {
+                tree.rotation.z = Math.sin(time * 0.5 + index) * 0.02;
+                tree.rotation.x = Math.sin(time * 0.3 + index * 0.5) * 0.01;
+            });
+
+            // 花瓣飘落动画
+            petals.forEach(petal => {
+                const data = petal.userData;
+
+                // 下落
+                petal.position.y -= data.fallSpeed;
+
+                // 左右摇摆
+                petal.position.x = data.initialX + Math.sin(time * data.swaySpeed + data.phase) * data.swayAmount;
+
+                // 旋转
+                petal.rotation.x += data.rotateSpeed;
+                petal.rotation.y += data.rotateSpeed * 0.7;
+                petal.rotation.z += data.rotateSpeed * 0.5;
+
+                // 重置位置
+                if (petal.position.y < -1) {
+                    petal.position.y = 25 + Math.random() * 10;
+                    petal.position.x = (Math.random() - 0.5) * 80;
+                    petal.position.z = (Math.random() - 0.5) * 80 - 10;
+                    data.initialX = petal.position.x;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // ==================== 事件处理 ====================
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) {
+            mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+            mouseY = (event.clientY / window.innerHeight) * 2 - 1;
+        }
+
+        // 初始化场景
+        init();
+    </script>
+</body>
+
+</html>

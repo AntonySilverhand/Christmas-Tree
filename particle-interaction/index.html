@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Immersive Particle Interaction</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- MediaPipe Globals -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <!-- Webcam video (hidden, used for processing) -->
+    <video id="input_video" style="display: none;"></video>
+
+    <!-- Canvas for 3D rendering and video feed background -->
+    <canvas id="output_canvas"></canvas>
+
+    <!-- Loading overlay -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>Initializing Neural Networks...</p>
+    </div>
+
+
+
+    <!-- Full-screen Photo Viewer -->
+    <div id="photo-viewer" style="display: none;">
+        <div class="photo-viewer-backdrop"></div>
+        <div class="photo-viewer-content">
+            <img id="photo-viewer-image" src="" alt="Photo">
+            <div class="photo-viewer-close">✕ 打开手掌关闭</div>
+        </div>
+    </div>
+
+    <!-- Settings Button -->
+    <button id="settings-btn" title="设置">⚙️</button>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel">
+        <div class="settings-header">
+            <h2 id="settings-title">🎄 场景设置</h2>
+            <button id="settings-close">✕</button>
+        </div>
+
+        <!-- Message when not in a tree scene -->
+        <div id="settings-no-scene" class="settings-message">
+            <p>⚠️ 请先进入一个树场景</p>
+            <p class="hint">输入 <code>aurora</code> 或 <code>tree</code> 进入场景后再设置</p>
+        </div>
+
+        <!-- Aurora Tree Settings -->
+        <div id="aurora-settings" class="settings-section" style="display: none;">
+            <h3>🌌 Aurora Tree</h3>
+            <div class="setting-item">
+                <label for="aurora-text">树顶文字</label>
+                <input type="text" id="aurora-text" placeholder="Aurora" maxlength="20">
+            </div>
+            <div class="setting-item">
+                <label>上传媒体</label>
+                <input type="file" id="aurora-upload" multiple accept="image/*,audio/*,video/*">
+                <div id="aurora-media-list" class="media-list"></div>
+            </div>
+        </div>
+
+        <!-- Empty Tree Settings -->
+        <div id="tree-settings" class="settings-section" style="display: none;">
+            <h3>🌲 Empty Tree</h3>
+            <div class="setting-item">
+                <label for="tree-text">树顶文字</label>
+                <input type="text" id="tree-text" placeholder="Merry Xmas" maxlength="20">
+            </div>
+            <div class="setting-item">
+                <label>上传媒体</label>
+                <input type="file" id="tree-upload" multiple accept="image/*,audio/*,video/*">
+                <div id="tree-media-list" class="media-list"></div>
+            </div>
+        </div>
+
+        <div class="settings-footer" id="settings-footer" style="display: none;">
+            <button id="save-settings">💾 保存设置</button>
+        </div>
+    </div>
+
+    <!-- Media Viewer (for audio/video) -->
+    <div id="media-viewer" style="display: none;">
+        <div class="media-viewer-backdrop"></div>
+        <div class="media-viewer-content">
+            <video id="media-viewer-video" controls></video>
+            <audio id="media-viewer-audio" controls></audio>
+            <div class="media-viewer-close">✕ 打开手掌关闭</div>
+        </div>
+    </div>
+
+    <!-- CC/Subtitle Overlay for Tutorial -->
+    <div id="cc-overlay">
+        <div id="cc-text"></div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>
