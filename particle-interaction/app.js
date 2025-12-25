@@ -18,13 +18,13 @@ const TUTORIAL_FINGER_CC = "This is the finger you use for switching between sce
 const TUTORIAL_SWITCH_PROMPT = "Now with your right finger showing 1, you can switch scenes with your left hand. For example, with your right hand showing 1, show 1 with your left hand";
 const TUTORIAL_SWITCH_SUCCESS = "Welldone";
 const TUTORIAL_SCENE2_PROMPT = "Now try showing your left hand with 2 with righthand 1 and see what we have in scene 2!";
-const TUTORIAL_DRAG_CC = "Pinch with your left index and thumb, and try to drag and move the element";
+const TUTORIAL_DRAG_CC = "Pinch with your right index and thumb, and try to drag and move the element";
 const TUTORIAL_ROTATE_CC = "Great! Now pinch with three fingers (thumb + index + middle) and rotate!";
 const TUTORIAL_SCALE_CC = "Awesome! Finally, pinch with both hands and zoom in/out!";
 // 3D Tutorial Constants
 const TUTORIAL_3D_INTRO = "Now you've mastered all skills when interacting with texts, let's move on to 3D scenes...";
-const TUTORIAL_3D_LOOK = "Pinch with three fingers on your LEFT hand and drag to look around";
-const TUTORIAL_3D_MOVE = "Great! Now pinch with three fingers on your RIGHT hand and drag to move";
+const TUTORIAL_3D_LOOK = "Pinch with three fingers on your RIGHT hand and drag to look around";
+const TUTORIAL_3D_MOVE = "Great! Now pinch with three fingers on your LEFT hand and drag to move";
 const TUTORIAL_3D_COMPLETE = "Excellent! You've mastered 3D navigation. Tutorial complete!";
 const INTRO_FORMATION_TIME = 1000; // ms for particles to form the text (~1s)
 const INTRO_STAY_TIME = 1500; // ms to stay after text is formed
@@ -35,6 +35,7 @@ let introPhase = 0;
 let introComplete = false;
 let handRecognitionEnabled = false;
 let waitingForPalms = false; // True when waiting for user to show palms
+let palmDetectionStartTime = null; // Timestamp for palm detection confirmation
 let waitingForFinger = false; // True when waiting for right hand "1" gesture
 let waitingForLeftOne = false; // True when waiting for left hand "1" while right shows "1"
 let waitingForLeftTwo = false; // True when waiting for left hand "2" while right shows "1"
@@ -880,9 +881,18 @@ async function init() {
         // Only process hand results if hand recognition is enabled
         if (handRecognitionEnabled) {
             // Check if we're waiting for palms during tutorial
-            if (waitingForPalms && results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                // Any hand detected counts as showing palms
-                onPalmsDetected();
+            if (waitingForPalms && results.multiHandLandmarks && results.multiHandLandmarks.length >= 2) {
+                // Require BOTH hands for "show your palms" with confirmation delay
+                if (!palmDetectionStartTime) {
+                    palmDetectionStartTime = Date.now();
+                    console.log('👐 Both hands detected, confirming...');
+                } else if (Date.now() - palmDetectionStartTime >= 500) {
+                    // Confirmed for 0.5 seconds
+                    onPalmsDetected();
+                }
+            } else {
+                // Reset if hands lost
+                palmDetectionStartTime = null;
             }
 
             // Check if we're waiting for right hand "1" gesture during tutorial
@@ -1220,6 +1230,7 @@ function startIntroSequence() {
     introComplete = false;
     handRecognitionEnabled = false;
     waitingForPalms = false;
+    palmDetectionStartTime = null;
     waitingForFinger = false;
     waitingForLeftOne = false;
     waitingForLeftTwo = false;
@@ -1366,24 +1377,30 @@ function onScaleDetected() {
     waitingForScale = false;
     introPhase = 11;
 
-    // Show 3D intro CC
-    showCC(TUTORIAL_3D_INTRO);
-    console.log('🌐 Transitioning to 3D tutorial...');
+    // Show success feedback and let user experience the zoom effect
+    showCC("Awesome! You've mastered zooming!");
+    console.log('🔍 Scale success - letting user experience zoom effect...');
 
-    // After 3 seconds, enter Cherry Blossom for 3D tutorial
+    // After 2 seconds of enjoying the zoom, show 3D intro
     setTimeout(() => {
-        introPhase = 12;
+        showCC(TUTORIAL_3D_INTRO);
+        console.log('🌐 Transitioning to 3D tutorial...');
 
-        // Enter Cherry Blossom mode for 3D tutorial
-        if (!isCherryBlossomMode) {
-            toggleCherryBlossomMode();
-        }
+        // After another 3 seconds, enter Cherry Blossom for 3D tutorial
+        setTimeout(() => {
+            introPhase = 12;
 
-        // Show look tutorial CC
-        showCC(TUTORIAL_3D_LOOK);
-        waitingFor3DLook = true;
-        console.log('👁️ Waiting for 3D look gesture (left 3-finger pinch)...');
-    }, 3000);
+            // Enter Cherry Blossom mode for 3D tutorial
+            if (!isCherryBlossomMode) {
+                toggleCherryBlossomMode();
+            }
+
+            // Show look tutorial CC
+            showCC(TUTORIAL_3D_LOOK);
+            waitingFor3DLook = true;
+            console.log('👁️ Waiting for 3D look gesture (left 3-finger pinch)...');
+        }, 3000);
+    }, 2000);
 }
 
 // Called when 3D look gesture is detected during tutorial
