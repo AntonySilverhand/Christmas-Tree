@@ -15,16 +15,22 @@ const TUTORIAL_PROMPT = "Show Your Palms";
 const TUTORIAL_SUCCESS = "Good Lets Go";
 const TUTORIAL_FINGER_PROMPT = "Show 1 With Right Hand";
 const TUTORIAL_FINGER_CC = "This is the finger you use for switching between scenes. There are different scenes built-in, and later you will have the chance to explore them all!";
+const TUTORIAL_SWITCH_PROMPT = "Now with your right finger showing 1, you can switch scenes with your left hand. For example, with your right hand showing 1, show 1 with your left hand";
+const TUTORIAL_SWITCH_SUCCESS = "Welldone";
+const TUTORIAL_SCENE2_PROMPT = "Now try showing your left hand with 2 with righthand 1 and see what we have in scene 2!";
+const TUTORIAL_DRAG_CC = "Pinch with your right index and thumb, and try to drag and move the element";
 const INTRO_FORMATION_TIME = 1000; // ms for particles to form the text (~1s)
 const INTRO_STAY_TIME = 1500; // ms to stay after text is formed
 const INTRO_FIRST_TEXT_STAY = 5000; // First text "Merry Christmas" stays 5 seconds
 const INTRO_DURATION = INTRO_FORMATION_TIME + INTRO_STAY_TIME; // Total time per intro text (after first)
-// Phases: 0=MerryXmas, 1=BPPresents, 2=ShowPalms, 3=GoodLetsGo, 4=ShowFinger, 5=FingerDetected, 6=done
+// Phases: 0=MerryXmas, 1=BPPresents, 2=ShowPalms, 3=GoodLetsGo, 4=ShowFinger, 5=FingerDetected, 6=WaitLeftOne, 7=WaitLeftTwo, 8=DragTutorial, 9=done
 let introPhase = 0;
 let introComplete = false;
 let handRecognitionEnabled = false;
 let waitingForPalms = false; // True when waiting for user to show palms
 let waitingForFinger = false; // True when waiting for right hand "1" gesture
+let waitingForLeftOne = false; // True when waiting for left hand "1" while right shows "1"
+let waitingForLeftTwo = false; // True when waiting for left hand "2" while right shows "1"
 const PARTICLE_SIZE = 0.12;
 const PARTICLE_COLOR = 0xffffff;
 const CANVAS_WIDTH = 1024; // Resolution for text generation
@@ -880,6 +886,33 @@ async function init() {
                 }
             }
 
+            // Check for left hand gestures while right hand shows "1" during tutorial
+            if ((waitingForLeftOne || waitingForLeftTwo) && results.multiHandLandmarks && results.multiHandedness) {
+                let rightHandShowingOne = false;
+                let leftHand = null;
+
+                // First, find both hands and check right hand state
+                for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                    const label = results.multiHandedness[i].label;
+                    if (label === 'Left') { // User's right hand (mirrored)
+                        if (isRightHandShowingOne(results.multiHandLandmarks[i])) {
+                            rightHandShowingOne = true;
+                        }
+                    } else if (label === 'Right') { // User's left hand (mirrored)
+                        leftHand = results.multiHandLandmarks[i];
+                    }
+                }
+
+                // Only check left hand if right hand is showing "1"
+                if (rightHandShowingOne && leftHand) {
+                    if (waitingForLeftOne && isHandShowingNumber(leftHand, 1)) {
+                        onLeftOneDetected();
+                    } else if (waitingForLeftTwo && isHandShowingNumber(leftHand, 2)) {
+                        onLeftTwoDetected();
+                    }
+                }
+            }
+
             // Only process full interaction if intro is complete
             if (introComplete) {
                 onHandsResults(results);
@@ -1136,6 +1169,8 @@ function startIntroSequence() {
     handRecognitionEnabled = false;
     waitingForPalms = false;
     waitingForFinger = false;
+    waitingForLeftOne = false;
+    waitingForLeftTwo = false;
     hideCC();
 
     // Show first intro text: "Merry Christmas"
@@ -1190,18 +1225,64 @@ function onFingerOneDetected() {
     // Show CC message with explanation
     showCC(TUTORIAL_FINGER_CC);
 
-    // Complete intro after CC is shown
+    // After 4 seconds, show the switch prompt and wait for left hand "1"
     setTimeout(() => {
         introPhase = 6;
-        introComplete = true;
-        hideCC();
+        waitingForLeftOne = true;
+        showCC(TUTORIAL_SWITCH_PROMPT);
+        console.log('👆 Waiting for left hand "1" while right hand shows "1"...');
+    }, 4000);
+}
 
-        // Set to first regular text model
-        currentModelIndex = -1; // Reset so changeText works
-        changeText(0);
+// Called when left hand "1" is detected while right hand shows "1"
+function onLeftOneDetected() {
+    if (!waitingForLeftOne || introPhase !== 6) return;
 
-        console.log('🎉 Tutorial complete! Full interaction enabled.');
-    }, 4000); // Show CC for 4 seconds
+    console.log('✅ Left hand "1" detected!');
+    waitingForLeftOne = false;
+    introPhase = 7;
+
+    // Show "Welldone" as particle text
+    setTextDirect(TUTORIAL_SWITCH_SUCCESS);
+
+    // Show next prompt in CC
+    showCC(TUTORIAL_SCENE2_PROMPT);
+    waitingForLeftTwo = true;
+    console.log('✌️ Waiting for left hand "2" while right hand shows "1"...');
+}
+
+// Called when left hand "2" is detected while right hand shows "1"
+function onLeftTwoDetected() {
+    if (!waitingForLeftTwo || introPhase !== 7) return;
+
+    console.log('✅ Left hand "2" detected!');
+    waitingForLeftTwo = false;
+    introPhase = 8;
+    hideCC();
+
+    // Show "Welldone" for 3 seconds
+    setTextDirect(TUTORIAL_SWITCH_SUCCESS);
+    console.log('👏 Showing Welldone for 3 seconds...');
+
+    setTimeout(() => {
+        // Switch to "Merry Christmas" and show drag tutorial CC
+        setTextDirect(INTRO_TEXTS[0]); // "Merry Christmas"
+        showCC(TUTORIAL_DRAG_CC);
+        console.log('🎯 Showing drag tutorial...');
+
+        // Complete tutorial after 5 seconds (give user time to try dragging)
+        setTimeout(() => {
+            introPhase = 9;
+            introComplete = true;
+            hideCC();
+
+            // Set to first regular text model
+            currentModelIndex = -1;
+            changeText(0);
+
+            console.log('🎉 Tutorial complete! Full interaction enabled.');
+        }, 5000);
+    }, 3000);
 }
 
 // CC Overlay Functions
@@ -1244,7 +1325,40 @@ function isRightHandShowingOne(hand) {
     return indexExtended && !middleExtended && !ringExtended && !pinkyExtended && !thumbExtended;
 }
 
-// --- Hand Logic & Interaction ---
+// Check if a hand is showing a specific number (1-5)
+function isHandShowingNumber(hand, number) {
+    if (!hand || number < 1 || number > 5) return false;
+    const wrist = hand[0];
+    const EXTENSION_MARGIN = 1.15;
+
+    // Check each finger extension
+    const indexExtended = dist(hand[8], wrist) > dist(hand[6], wrist) * EXTENSION_MARGIN;
+    const middleExtended = dist(hand[12], wrist) > dist(hand[10], wrist) * EXTENSION_MARGIN;
+    const ringExtended = dist(hand[16], wrist) > dist(hand[14], wrist) * EXTENSION_MARGIN;
+    const pinkyExtended = dist(hand[20], wrist) > dist(hand[18], wrist) * EXTENSION_MARGIN;
+
+    // Check thumb extension
+    const thumbTip = hand[4];
+    const indexMCP = hand[5];
+    const thumbDist = dist(thumbTip, indexMCP);
+    const thumbExtended = thumbDist > 0.08;
+
+    // Count extended fingers (excluding thumb for 1-4)
+    const extendedCount = (indexExtended ? 1 : 0) + (middleExtended ? 1 : 0) + (ringExtended ? 1 : 0) + (pinkyExtended ? 1 : 0);
+
+    if (number === 1) {
+        return indexExtended && !middleExtended && !ringExtended && !pinkyExtended && !thumbExtended;
+    } else if (number === 2) {
+        return indexExtended && middleExtended && !ringExtended && !pinkyExtended && !thumbExtended;
+    } else if (number === 3) {
+        return indexExtended && middleExtended && ringExtended && !pinkyExtended && !thumbExtended;
+    } else if (number === 4) {
+        return indexExtended && middleExtended && ringExtended && pinkyExtended && !thumbExtended;
+    } else if (number === 5) {
+        return indexExtended && middleExtended && ringExtended && pinkyExtended && thumbExtended;
+    }
+    return false;
+}
 
 // Helper to calculate distance between two landmarks
 function dist(p1, p2) {
