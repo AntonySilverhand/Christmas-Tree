@@ -179,6 +179,97 @@ body {
     filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.5));
 }
 
+/* Custom Text Panel */
+#custom-text-panel {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 500;
+    display: none; /* Hidden by default, shown only on custom text scene */
+    align-items: center;
+    gap: 10px;
+}
+
+#custom-text-toggle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+#custom-text-toggle:hover {
+    background: rgba(100, 200, 255, 0.3);
+    border-color: #88ccff;
+    transform: scale(1.1);
+}
+
+#custom-text-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 12px;
+    border-radius: 25px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+#custom-text-input {
+    width: 200px;
+    padding: 10px 15px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    color: white;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+#custom-text-input:focus {
+    border-color: #88ccff;
+    box-shadow: 0 0 15px rgba(136, 204, 255, 0.3);
+}
+
+#custom-text-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#custom-text-save {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #88ccff, #5599ff);
+    border: none;
+    border-radius: 20px;
+    color: white;
+    font-weight: bold;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#custom-text-save:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(136, 204, 255, 0.4);
+}
+
 /* Settings Button */
 #settings-btn {
     position: fixed;

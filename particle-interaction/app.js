@@ -7,7 +7,23 @@ const Camera = window.Camera;
 const HAND_CONNECTIONS = window.HAND_CONNECTIONS;
 
 // --- Configuration ---
-const TEXTS = ["BP Debate Union", "Aurora", "BPDU Team Presents"];
+let customParticleText = localStorage.getItem('customParticleText') || "Customize Text";
+const TEXTS = ["Merry Christmas", "BPDU Team Presents", customParticleText];
+
+// Function to update custom text
+function updateCustomText(newText) {
+    if (!newText || newText.trim() === '') return;
+    customParticleText = newText.trim();
+    TEXTS[2] = customParticleText;
+    localStorage.setItem('customParticleText', customParticleText);
+
+    // If currently viewing the custom text, refresh it
+    if (currentModelIndex === 2) {
+        currentModelIndex = -1; // Force refresh
+        changeText(2);
+    }
+    console.log(`✏️ Custom text updated to: "${customParticleText}"`);
+}
 
 // Welcome Intro Sequence
 const INTRO_TEXTS = ["Merry Christmas", "BP Debate Union Presents"];
@@ -497,6 +513,65 @@ function initSettingsUI() {
         treeUpload.value = '';
         updateMediaListUI('tree');
     });
+
+    // Initialize custom text panel
+    initCustomTextPanel();
+}
+
+// Initialize Custom Text Panel UI
+function initCustomTextPanel() {
+    const toggleBtn = document.getElementById('custom-text-toggle');
+    const form = document.getElementById('custom-text-form');
+    const input = document.getElementById('custom-text-input');
+    const saveBtn = document.getElementById('custom-text-save');
+
+    if (!toggleBtn || !form || !input || !saveBtn) return;
+
+    // Load saved custom text into input
+    input.value = customParticleText;
+
+    // Toggle form visibility
+    toggleBtn.addEventListener('click', () => {
+        const isVisible = form.style.display !== 'none';
+        form.style.display = isVisible ? 'none' : 'flex';
+        if (!isVisible) {
+            input.focus();
+            input.select();
+        }
+    });
+
+    // Save on button click
+    saveBtn.addEventListener('click', () => {
+        updateCustomText(input.value);
+        form.style.display = 'none';
+
+        // Show feedback
+        showCC(`Text updated to: "${customParticleText}"`);
+        setTimeout(() => hideCC(), 2000);
+    });
+
+    // Save on Enter key
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            updateCustomText(input.value);
+            form.style.display = 'none';
+
+            showCC(`Text updated to: "${customParticleText}"`);
+            setTimeout(() => hideCC(), 2000);
+        } else if (e.key === 'Escape') {
+            form.style.display = 'none';
+        }
+    });
+}
+
+// Update custom text button visibility based on current scene
+function updateCustomTextButtonVisibility() {
+    const panel = document.getElementById('custom-text-panel');
+    if (!panel) return;
+
+    // Only show when in particle text mode AND on the custom text (index 2)
+    const shouldShow = !isCherryBlossomMode && !isChristmasMode && !isPhotoTreeMode && !isEmptyTreeMode && currentModelIndex === 2;
+    panel.style.display = shouldShow ? 'flex' : 'none';
 }
 
 // Update settings button visibility based on current scene
@@ -1199,6 +1274,10 @@ function changeText(index) {
     if (index < 0 || index >= TEXTS.length) return;
     if (currentModelIndex === index) return;
     currentModelIndex = index;
+
+    // Update custom text button visibility
+    updateCustomTextButtonVisibility();
+
     const points = generateTextParticles(TEXTS[index]);
     textParticleCount = Math.floor(points.length / 3); // Track how many particles form the text
 
@@ -1765,8 +1844,12 @@ function onHandsResults(results) {
                                     toggleCherryBlossomMode(); // Enter CB
                                 }
                                 pendingGestureIndex = -2; // Wait for release
-                            } else if (!isCherryBlossomMode && !isChristmasMode && introComplete) {
-                                // Switch Model (only in particle mode and after tutorial)
+                            } else if (introComplete) {
+                                // Switch to text Model (exit any 3D mode first)
+                                if (isCherryBlossomMode) toggleCherryBlossomMode();
+                                if (isChristmasMode) toggleChristmasMode();
+                                if (isPhotoTreeMode) togglePhotoTreeMode();
+                                if (isEmptyTreeMode) toggleEmptyTreeMode();
                                 changeText(targetAction);
                                 pendingGestureIndex = -1;
                             }
@@ -2608,6 +2691,7 @@ function toggleCherryBlossomMode() {
     // Reset camera controls
     resetSceneCamera(isCherryBlossomMode ? cherryBlossomCamera : null);
     updateSettingsButtonVisibility();
+    updateCustomTextButtonVisibility();
 
     console.log("Cherry Blossom Mode:", isCherryBlossomMode ? "ON" : "OFF");
 }
@@ -3081,6 +3165,7 @@ function toggleChristmasMode() {
 
     resetSceneCamera(isChristmasMode ? christmasCamera : null);
     updateSettingsButtonVisibility();
+    updateCustomTextButtonVisibility();
     console.log("Christmas Mode:", isChristmasMode ? "ON" : "OFF");
 }
 
@@ -3880,6 +3965,7 @@ function togglePhotoTreeMode() {
 
     resetSceneCamera(isPhotoTreeMode ? photoTreeCamera : null);
     updateSettingsButtonVisibility();
+    updateCustomTextButtonVisibility();
     console.log("Photo Tree Mode:", isPhotoTreeMode ? "ON" : "OFF");
 }
 
@@ -4449,6 +4535,7 @@ function toggleEmptyTreeMode() {
 
     resetSceneCamera(isEmptyTreeMode ? emptyTreeCamera : null);
     updateSettingsButtonVisibility();
+    updateCustomTextButtonVisibility();
     console.log("Empty Tree Mode:", isEmptyTreeMode ? "ON" : "OFF");
 }
 
