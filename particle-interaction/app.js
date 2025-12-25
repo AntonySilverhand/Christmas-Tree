@@ -34,6 +34,18 @@ const INTRO_DURATION = INTRO_FORMATION_TIME + INTRO_STAY_TIME; // Total time per
 // Phases: 0-7=existing, 8-10=ParticleTutorial, 11=3DIntro, 12=3DLook, 13=3DZoom, 14=3DMove, 15=3DComplete, 16=done
 let introPhase = 0;
 let introComplete = false;
+
+// Tutorial completion tracking
+const TUTORIAL_COMPLETED_KEY = 'christmasTreeTutorialCompleted';
+
+function isTutorialCompleted() {
+    return localStorage.getItem(TUTORIAL_COMPLETED_KEY) === 'true';
+}
+
+function markTutorialCompleted() {
+    localStorage.setItem(TUTORIAL_COMPLETED_KEY, 'true');
+    console.log('✅ Tutorial completion saved to browser storage');
+}
 let handRecognitionEnabled = false;
 let waitingForPalms = false; // True when waiting for user to show palms
 let palmDetectionStartTime = null; // Timestamp for palm detection confirmation
@@ -1233,6 +1245,13 @@ function setTextDirect(text) {
 }
 
 function startIntroSequence() {
+    // Check if tutorial was already completed
+    if (isTutorialCompleted()) {
+        console.log('🎓 Tutorial already completed, skipping to main experience...');
+        skipToMainExperience();
+        return;
+    }
+
     console.log('🎄 Starting welcome intro sequence...');
     introPhase = 0;
     introComplete = false;
@@ -1269,6 +1288,26 @@ function startIntroSequence() {
             console.log('👋 Waiting for user to show palms...');
         }, INTRO_DURATION);
     }, INTRO_FIRST_TEXT_STAY); // First text stays 3 seconds
+}
+
+// Skip tutorial and go directly to main experience
+function skipToMainExperience() {
+    introPhase = 16;
+    introComplete = true;
+    handRecognitionEnabled = true;
+
+    // Set to first regular text model
+    currentModelIndex = -1;
+    changeText(0);
+
+    // Show welcome back message
+    showCC("Welcome back! All gestures are enabled. Explore freely!");
+
+    setTimeout(() => {
+        hideCC();
+    }, 3000);
+
+    console.log('🚀 Skipped to main experience (tutorial previously completed)');
 }
 
 // Called when palms are detected during intro
@@ -1461,6 +1500,9 @@ function on3DMoveDetected() {
 function onTutorialComplete() {
     introPhase = 16;
     introComplete = true;
+
+    // Save tutorial completion to browser storage
+    markTutorialCompleted();
 
     // Exit Cherry Blossom mode back to particle mode
     if (isCherryBlossomMode) {
