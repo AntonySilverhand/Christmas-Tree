@@ -21,12 +21,16 @@ const TUTORIAL_SCENE2_PROMPT = "Now try showing your left hand with 2 with right
 const TUTORIAL_DRAG_CC = "Pinch with your left index and thumb, and try to drag and move the element";
 const TUTORIAL_ROTATE_CC = "Great! Now pinch with three fingers (thumb + index + middle) and rotate!";
 const TUTORIAL_SCALE_CC = "Awesome! Finally, pinch with both hands and zoom in/out!";
-const TUTORIAL_COMPLETE_CC = "Perfect! You've mastered all the gestures. Enjoy exploring!";
+// 3D Tutorial Constants
+const TUTORIAL_3D_INTRO = "Now you've mastered all skills when interacting with texts, let's move on to 3D scenes...";
+const TUTORIAL_3D_LOOK = "Pinch with three fingers on your LEFT hand and drag to look around";
+const TUTORIAL_3D_MOVE = "Great! Now pinch with three fingers on your RIGHT hand and drag to move";
+const TUTORIAL_3D_COMPLETE = "Excellent! You've mastered 3D navigation. Tutorial complete!";
 const INTRO_FORMATION_TIME = 1000; // ms for particles to form the text (~1s)
 const INTRO_STAY_TIME = 1500; // ms to stay after text is formed
 const INTRO_FIRST_TEXT_STAY = 5000; // First text "Merry Christmas" stays 5 seconds
 const INTRO_DURATION = INTRO_FORMATION_TIME + INTRO_STAY_TIME; // Total time per intro text (after first)
-// Phases: 0-7=existing, 8=DragTutorial, 9=RotateTutorial, 10=ScaleTutorial, 11=Complete, 12=done
+// Phases: 0-7=existing, 8-10=ParticleTutorial, 11=3DIntro, 12=3DLook, 13=3DMove, 14=3DComplete, 15=done
 let introPhase = 0;
 let introComplete = false;
 let handRecognitionEnabled = false;
@@ -38,6 +42,9 @@ let waitingForLeftTwo = false; // True when waiting for left hand "2" while righ
 let waitingForDrag = false;
 let waitingForRotate = false;
 let waitingForScale = false;
+// 3D Tutorial states
+let waitingFor3DLook = false;
+let waitingFor3DMove = false;
 const PARTICLE_SIZE = 0.12;
 const PARTICLE_COLOR = 0xffffff;
 const CANVAS_WIDTH = 1024; // Resolution for text generation
@@ -938,6 +945,25 @@ async function init() {
                     if (waitingForScale && isScaling) {
                         onScaleDetected();
                     }
+                    // Check if 3D look was detected (left 3-finger pinch causes isRotating in CB mode)
+                    if (waitingFor3DLook && isRotating) {
+                        on3DLookDetected();
+                    }
+                    // Check if 3D move was detected (right 3-finger pinch causes movement)
+                    if (waitingFor3DMove && previousGripPos !== null) {
+                        on3DMoveDetected();
+                    }
+                }
+            } else if (introPhase >= 12 && introPhase <= 13) {
+                // During 3D tutorial phases, process Cherry Blossom gestures
+                onHandsResults(results);
+
+                // Check for 3D tutorial gesture completions
+                if (waitingFor3DLook && isRotating) {
+                    on3DLookDetected();
+                }
+                if (waitingFor3DMove && previousGripPos !== null) {
+                    on3DMoveDetected();
                 }
             } else {
                 // During early tutorial phases, still show hand visuals for feedback
@@ -1200,6 +1226,8 @@ function startIntroSequence() {
     waitingForDrag = false;
     waitingForRotate = false;
     waitingForScale = false;
+    waitingFor3DLook = false;
+    waitingFor3DMove = false;
     hideCC();
 
     // Show first intro text: "Merry Christmas"
@@ -1338,22 +1366,75 @@ function onScaleDetected() {
     waitingForScale = false;
     introPhase = 11;
 
+    // Show 3D intro CC
+    showCC(TUTORIAL_3D_INTRO);
+    console.log('🌐 Transitioning to 3D tutorial...');
+
+    // After 3 seconds, enter Cherry Blossom for 3D tutorial
+    setTimeout(() => {
+        introPhase = 12;
+
+        // Enter Cherry Blossom mode for 3D tutorial
+        if (!isCherryBlossomMode) {
+            toggleCherryBlossomMode();
+        }
+
+        // Show look tutorial CC
+        showCC(TUTORIAL_3D_LOOK);
+        waitingFor3DLook = true;
+        console.log('👁️ Waiting for 3D look gesture (left 3-finger pinch)...');
+    }, 3000);
+}
+
+// Called when 3D look gesture is detected during tutorial
+function on3DLookDetected() {
+    if (!waitingFor3DLook || introPhase !== 12) return;
+
+    console.log('✅ 3D look gesture detected!');
+    waitingFor3DLook = false;
+    introPhase = 13;
+
+    // Show move tutorial CC
+    showCC(TUTORIAL_3D_MOVE);
+    waitingFor3DMove = true;
+    console.log('🚶 Waiting for 3D move gesture (right 3-finger pinch)...');
+}
+
+// Called when 3D move gesture is detected during tutorial
+function on3DMoveDetected() {
+    if (!waitingFor3DMove || introPhase !== 13) return;
+
+    console.log('✅ 3D move gesture detected!');
+    waitingFor3DMove = false;
+    introPhase = 14;
+
     // Show completion CC
-    showCC(TUTORIAL_COMPLETE_CC);
+    showCC(TUTORIAL_3D_COMPLETE);
 
     // Complete tutorial after 3 seconds
     setTimeout(() => {
-        introPhase = 12;
-        introComplete = true;
-        hideCC();
-
-        // Set to first regular text model
-        currentModelIndex = -1;
-        changeText(0);
-
-        console.log('🎉 Tutorial complete! Full interaction enabled.');
+        onTutorialComplete();
     }, 3000);
 }
+
+// Called when entire tutorial is complete
+function onTutorialComplete() {
+    introPhase = 15;
+    introComplete = true;
+    hideCC();
+
+    // Exit Cherry Blossom mode back to particle mode
+    if (isCherryBlossomMode) {
+        toggleCherryBlossomMode();
+    }
+
+    // Set to first regular text model
+    currentModelIndex = -1;
+    changeText(0);
+
+    console.log('🎉 Full tutorial complete! All interactions enabled.');
+}
+
 
 
 // CC Overlay Functions
@@ -1587,16 +1668,16 @@ function onHandsResults(results) {
                         // Same gesture being held
                         if (Date.now() - gestureStartTime >= GESTURE_CONFIRM_DELAY) {
                             if (targetAction === 3) {
-                                // Left 1 + Right 4 -> Only enter Cherry Blossom mode
-                                if (!isCherryBlossomMode) {
+                                // Left 1 + Right 4 -> Only enter Cherry Blossom mode (after tutorial)
+                                if (!isCherryBlossomMode && introComplete) {
                                     // Exit any other mode first
                                     if (isChristmasMode) toggleChristmasMode();
                                     if (isPhotoTreeMode) togglePhotoTreeMode();
                                     toggleCherryBlossomMode(); // Enter CB
                                 }
                                 pendingGestureIndex = -2; // Wait for release
-                            } else if (!isCherryBlossomMode && !isChristmasMode) {
-                                // Switch Model (only in particle mode)
+                            } else if (!isCherryBlossomMode && !isChristmasMode && introComplete) {
+                                // Switch Model (only in particle mode and after tutorial)
                                 changeText(targetAction);
                                 pendingGestureIndex = -1;
                             }
